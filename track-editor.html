@@ -94,6 +94,8 @@
   .map-card span { display: block; padding: 5px 6px; font-size: 11px; color: var(--txt);
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .map-empty { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; grid-column: 1 / -1; }
+  .zoom-row { display: flex; gap: 8px; }
+  .zoom-row button { flex: 1; }
 
   /* Mobile / écrans étroits : on empile tout et le canvas devient fluide. */
   @media (max-width: 860px) {
@@ -173,7 +175,7 @@
         </select>
       </label>
       <label class="row"><span>Couleur ligne</span><input type="color" id="lineColor" value="#f1c40f"></label>
-      <label class="row"><span>Épaisseur</span><input type="range" id="lineWidth" min="2" max="30" value="10"></label>
+      <label class="row"><span>Épaisseur</span><input type="range" id="lineWidth" min="2" max="60" value="10"></label>
       <label class="row"><span>Opacité du tracé</span><input type="range" id="opacity" min="10" max="100" value="100"></label>
       <label class="row"><span>Boucle (circuit fermé)</span><input type="checkbox" id="closed"></label>
       <label class="row"><span>Flèches de sens</span><input type="checkbox" id="arrows" checked></label>
@@ -188,6 +190,19 @@
     <div class="group">
       <div class="title">Aperçu</div>
       <label class="row"><span>Assombrir le fond</span><input type="range" id="bgDim" min="0" max="100" value="35"></label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="group">
+      <div class="title">Vue (zoom pour la précision)</div>
+      <div class="zoom-row">
+        <button id="zoomOut" title="Dézoomer">−</button>
+        <button id="zoomReset" title="Réinitialiser">100%</button>
+        <button id="zoomIn" title="Zoomer">+</button>
+      </div>
+      <label class="row"><span>Mode déplacement (pan) ✋</span><input type="checkbox" id="panMode"></label>
+      <div class="hint">Molette = zoom sur le curseur. Clic-molette (ou mode pan) = déplacer la vue.</div>
     </div>
 
     <div class="divider"></div>
@@ -250,6 +265,26 @@
   let pts = [];                     // points normalisés {x:0..1, y:0..1}
   let sel = -1;                     // index sélectionné
   let dragging = false;
+
+  // Vue (zoom/pan) : transform appliqué au rendu écran uniquement (pas à l'export).
+  const view = { scale: 1, ox: 0, oy: 0 };  // ox/oy en px internes (repère SIZE)
+  let panning = false, panStart = null;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const clampView = () => {
+    if (view.scale <= 1) { view.scale = 1; view.ox = 0; view.oy = 0; return; }
+    const min = SIZE - SIZE * view.scale;   // <= 0
+    view.ox = Math.max(min, Math.min(0, view.ox));
+    view.oy = Math.max(min, Math.min(0, view.oy));
+  };
+  // Zoom en gardant le point (cx,cy) [px internes] fixe à l'écran.
+  const zoomAt = (cx, cy, factor) => {
+    const ns = Math.max(1, Math.min(8, view.scale * factor));
+    const k = ns / view.scale;
+    view.ox = cx - (cx - view.ox) * k;
+    view.oy = cy - (cy - view.oy) * k;
+    view.scale = ns;
+    clampView(); render();
+  };
 
   const el = (id) => document.getElementById(id);
 
@@ -317,8 +352,14 @@
 
   // ---- Rendu -----------------------------------------------------------------
   // target: canvas de sortie. withBg: dessiner le fond. s: taille cible.
-  function draw(context, s, withBg) {
+  function draw(context, s, withBg, v) {
+    v = v || { scale: 1, ox: 0, oy: 0 };
+    context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, s, s);
+    context.save();
+    const f = s / SIZE;                 // offsets de vue exprimés dans le repère SIZE
+    context.translate(v.ox * f, v.oy * f);
+    context.scale(v.scale, v.scale);
     if (withBg) {
       if (bg) {
         context.drawImage(bg, 0, 0, s, s);
@@ -458,11 +499,13 @@
         context.fillText(txt, p.x, p.y + r * 0.05);
       });
     }
+    context.restore();
   }
 
   function render() {
-    draw(ctx, SIZE, true);
+    draw(ctx, SIZE, true, view);
     el("ptCount").textContent = pts.length;
+    el("zoomReset").textContent = Math.round(view.scale * 100) + "%";
   }
 
   // Réglages de contour : uniquement pertinents pour le style "Ligne simple".
@@ -475,9 +518,13 @@
   // ---- Souris ----------------------------------------------------------------
   function evPos(e) {
     const rect = cv.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+    // px CSS -> px internes (repère SIZE)
+    const cx = (e.clientX - rect.left) * (SIZE / rect.width);
+    const cy = (e.clientY - rect.top) * (SIZE / rect.height);
+    // inversion de la vue (zoom/pan) -> normalisé 0..1
+    const x = (cx - view.ox) / view.scale / SIZE;
+    const y = (cy - view.oy) / view.scale / SIZE;
+    return { x: clamp01(x), y: clamp01(y) };
   }
   function hit(p) {
     const rNorm = Math.max(0.02, (style.width * 0.9 + 8) / BASE);
@@ -490,7 +537,16 @@
 
   // Pointer Events : gère souris ET tactile (mobile) de façon unifiée.
   cv.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;               // clic droit/milieu -> voir contextmenu
+    const rect = cv.getBoundingClientRect();
+    // Pan : clic-molette (bouton du milieu) ou mode déplacement actif.
+    if (e.button === 1 || el("panMode").checked) {
+      panning = true;
+      panStart = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, w: rect.width, h: rect.height };
+      try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+      return;
+    }
+    if (e.button !== 0) return;               // clic droit -> voir contextmenu
     const p = evPos(e), h = hit(p);
     if (h >= 0) { sel = h; dragging = true; }
     else { pts.push(p); sel = pts.length - 1; }
@@ -498,14 +554,27 @@
     render();
   });
   cv.addEventListener("pointermove", (e) => {
+    if (panning && panStart) {
+      view.ox = panStart.ox + (e.clientX - panStart.x) * (SIZE / panStart.w);
+      view.oy = panStart.oy + (e.clientY - panStart.y) * (SIZE / panStart.h);
+      clampView(); render(); return;
+    }
     if (!dragging || sel < 0) return;
     pts[sel] = evPos(e); render();
   });
   cv.addEventListener("pointerup", (e) => {
-    dragging = false;
+    dragging = false; panning = false;
     try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
   });
-  cv.addEventListener("pointercancel", () => { dragging = false; });
+  cv.addEventListener("pointercancel", () => { dragging = false; panning = false; });
+  // Molette = zoom centré sur le curseur.
+  cv.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = cv.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (SIZE / rect.width);
+    const cy = (e.clientY - rect.top) * (SIZE / rect.height);
+    zoomAt(cx, cy, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+  }, { passive: false });
   cv.addEventListener("contextmenu", (e) => {   // suppression au clic droit (desktop)
     e.preventDefault();
     const h = hit(evPos(e));
@@ -532,6 +601,10 @@
   el("checker").addEventListener("change", (e) => { style.checker = e.target.checked; render(); });
   el("outline").addEventListener("change", (e) => { style.outline = e.target.checked; render(); });
   el("bgDim").addEventListener("input", (e) => { style.bgDim = +e.target.value; render(); });
+
+  el("zoomIn").addEventListener("click", () => zoomAt(SIZE / 2, SIZE / 2, 1.3));
+  el("zoomOut").addEventListener("click", () => zoomAt(SIZE / 2, SIZE / 2, 1 / 1.3));
+  el("zoomReset").addEventListener("click", () => { view.scale = 1; view.ox = 0; view.oy = 0; render(); });
 
   el("undo").addEventListener("click", () => { pts.pop(); sel = pts.length - 1; render(); });
   el("delSel").addEventListener("click", () => { if (sel >= 0) { pts.splice(sel, 1); sel = pts.length - 1; render(); } });
