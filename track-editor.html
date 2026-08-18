@@ -619,6 +619,20 @@
     const grid = el("mapGrid");
     let entries = [];
 
+    // Noms FR (pour la recherche ET l'affichage) là où ils diffèrent de l'anglais.
+    const FR = {
+      "01_karelia": "Carélie", "18_cliff": "Falaise", "19_monastery": "Abbaye",
+      "28_desert": "Rivière de sable", "31_airfield": "Terrain d'aviation",
+      "36_fishing_bay": "Baie du pêcheur", "37_caucasus": "Col de montagne",
+      "14_siegfried_line": "Ligne Siegfried", "38_mannerheim_line": "Ligne Mannerheim",
+      "45_north_america": "Autoroute", "47_canada_a": "Côte sereine",
+      "59_asia_great_wall": "Frontière de l'Empire", "60_asia_miao": "Rivière des perles",
+      "63_tundra": "Toundra", "95_lost_city_ctf": "Ville fantôme",
+      "128_last_frontier_v": "Avant-poste",
+    };
+    // Normalise pour une recherche insensible aux accents et à la casse.
+    const norm = (s) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
     const openModal = () => { el("mapModal").classList.remove("hidden"); el("mapSearch").focus(); };
     const closeModal = () => { el("mapModal").classList.add("hidden"); };
 
@@ -631,15 +645,16 @@
     };
 
     const renderGrid = (q = "") => {
-      const needle = q.trim().toLowerCase();
-      const list = entries.filter((e) => e.name.toLowerCase().includes(needle) ||
-                                          e.id.toLowerCase().includes(needle));
+      const needle = norm(q.trim());
+      const list = entries.filter((e) =>
+        norm(e.name).includes(needle) || norm(e.fr).includes(needle) || norm(e.id).includes(needle));
       grid.innerHTML = "";
       if (!list.length) { grid.innerHTML = '<div class="map-empty">Aucune map.</div>'; return; }
       for (const e of list) {
+        const label = e.fr || e.name;
         const card = document.createElement("div");
         card.className = "map-card";
-        card.innerHTML = `<img loading="lazy" src="minimaps/${e.file}" alt="${e.name}"><span>${e.name}</span>`;
+        card.innerHTML = `<img loading="lazy" src="minimaps/${e.file}" alt="${label}"><span>${label}</span>`;
         card.addEventListener("click", () => selectMap(e));
         grid.appendChild(card);
       }
@@ -654,8 +669,8 @@
       .then((r) => r.json())
       .then((man) => {
         entries = Object.keys(man)
-          .map((id) => ({ id, name: man[id].name, file: man[id].file }))
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .map((id) => ({ id, name: man[id].name, fr: FR[id] || "", file: man[id].file }))
+          .sort((a, b) => (a.fr || a.name).localeCompare(b.fr || b.name));
         renderGrid();
       })
       .catch(() => {
