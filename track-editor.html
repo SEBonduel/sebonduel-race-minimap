@@ -175,7 +175,8 @@
         </select>
       </label>
       <label class="row"><span>Couleur ligne</span><input type="color" id="lineColor" value="#f1c40f"></label>
-      <label class="row"><span>Épaisseur</span><input type="range" id="lineWidth" min="2" max="60" value="10"></label>
+      <label class="row"><span>Épaisseur (route)</span><input type="range" id="lineWidth" min="2" max="60" value="10"></label>
+      <label class="row" id="kerbWidthRow"><span>Épaisseur des vibreurs</span><input type="range" id="kerbWidth" min="1" max="20" value="4"></label>
       <label class="row"><span>Opacité du tracé</span><input type="range" id="opacity" min="10" max="100" value="100"></label>
       <label class="row"><span>Boucle (circuit fermé)</span><input type="checkbox" id="closed"></label>
       <label class="row"><span>Flèches de sens</span><input type="checkbox" id="arrows" checked></label>
@@ -308,7 +309,7 @@
   }
 
   const style = {
-    mode: "circuit", color: "#f1c40f", width: 10, opacity: 100, closed: false,
+    mode: "circuit", color: "#f1c40f", width: 10, kerb: 4, opacity: 100, closed: false,
     arrows: true, showPts: true, checker: true, outline: true, outlineWidth: 6, bgDim: 35,
   };
 
@@ -395,7 +396,7 @@
 
       if (style.mode === "circuit" || style.mode === "road") {
         // Piste : bitume + vibreurs rouge/blanc sur les bords + ligne médiane.
-        const kerb = Math.max(3, style.width * 0.28);          // largeur d'un vibreur (px@512)
+        const kerb = Math.max(1, style.kerb);                  // largeur d'un vibreur (px@512)
         const outer = (style.width + 2 * kerb) * k;            // largeur totale piste+vibreurs
         const dash = Math.max(6, style.width + kerb) * k;      // longueur des bandes vibreur
         // liseré noir intrinsèque à la piste (indépendant des réglages "contour")
@@ -435,7 +436,7 @@
       if (style.checker) {
         const roadW = (style.mode === "line")
           ? style.width * k
-          : (style.width + 2 * Math.max(3, style.width * 0.28)) * k;
+          : (style.width + 2 * Math.max(1, style.kerb)) * k;
         const drawChecker = (pt, tan) => {
           const ang = Math.atan2(tan.y, tan.x);
           const halfW = roadW / 2 + 3 * k;                 // léger débord de part et d'autre
@@ -513,6 +514,7 @@
     const lineOnly = style.mode === "line";
     el("outlineRow").style.display = lineOnly ? "" : "none";
     el("outlineWidthRow").style.display = lineOnly ? "" : "none";
+    el("kerbWidthRow").style.display = lineOnly ? "none" : "";   // vibreurs = circuit only
   }
 
   // ---- Souris ----------------------------------------------------------------
@@ -593,6 +595,7 @@
   el("trackStyle").addEventListener("change", (e) => { style.mode = e.target.value; syncStyleControls(); render(); });
   el("lineColor").addEventListener("input", (e) => { style.color = e.target.value; render(); });
   el("lineWidth").addEventListener("input", (e) => { style.width = +e.target.value; render(); });
+  el("kerbWidth").addEventListener("input", (e) => { style.kerb = +e.target.value; render(); });
   el("opacity").addEventListener("input", (e) => { style.opacity = +e.target.value; render(); });
   el("outlineWidth").addEventListener("input", (e) => { style.outlineWidth = +e.target.value; render(); });
   el("closed").addEventListener("change", (e) => { style.closed = e.target.checked; render(); });
@@ -635,7 +638,7 @@
   el("exportJson").addEventListener("click", () => {
     const data = {
       map: el("mapName").value.trim(), closed: style.closed,
-      style: { mode: style.mode, color: style.color, width: style.width, opacity: style.opacity, arrows: style.arrows, showPts: style.showPts, checker: style.checker, outline: style.outline, outlineWidth: style.outlineWidth },
+      style: { mode: style.mode, color: style.color, width: style.width, kerb: style.kerb, opacity: style.opacity, arrows: style.arrows, showPts: style.showPts, checker: style.checker, outline: style.outline, outlineWidth: style.outlineWidth },
       points: pts.map((p) => ({ x: +p.x.toFixed(5), y: +p.y.toFixed(5) })),
     };
     download(safeName() + "_track.json", new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -656,6 +659,7 @@
         if (style.mode === "road") style.mode = "circuit";  // compat ancien nom
         el("trackStyle").value = style.mode || "circuit";
         el("lineColor").value = style.color; el("lineWidth").value = style.width;
+        el("kerbWidth").value = style.kerb != null ? style.kerb : 4;
         el("opacity").value = style.opacity; el("outlineWidth").value = style.outlineWidth;
         el("closed").checked = style.closed; el("arrows").checked = style.arrows;
         el("showPts").checked = style.showPts; el("outline").checked = style.outline;
