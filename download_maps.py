@@ -22,7 +22,7 @@ SIZE = 1024  # côté du webp final (léger, suffisant pour l'éditeur ET le mod
 MAPS = [
     ("01_karelia", "Karelia"), ("02_malinovka", "Malinovka"),
     ("03_campania_big", "Province"), ("04_himmelsdorf", "Himmelsdorf"),
-    ("05_prohorovka", "Prohorovka"), ("06_ensk", "Ensk"),
+    ("05_prohorovka", "Prokhorovka"), ("06_ensk", "Ensk"),
     ("06_ensk_big", "Ensk Region"), ("07_lakeville", "Lakeville"),
     ("08_ruinberg", "Ruinberg"), ("10_hills", "Mines"),
     ("11_murovanka", "Murovanka"), ("13_erlenberg", "Erlenberg"),

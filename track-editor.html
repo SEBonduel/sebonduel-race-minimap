@@ -72,6 +72,29 @@
   footer { padding: 6px 16px; background: var(--panel); border-top: 1px solid var(--line);
            color: var(--muted); font-size: 12px; display: flex; gap: 16px; align-items:center; }
 
+  /* Modale (alertes / confirmations dans le thème de l'app) */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal-backdrop.hidden { display: none; }
+  .modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .modal-box p { margin: 0 0 18px; color: var(--txt); font-size: 14px; line-height: 1.5; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-actions button { width: auto; min-width: 90px; }
+  .mapmodal-box { max-width: 760px; }
+  .mapmodal-head { display: flex; gap: 8px; margin-bottom: 12px; }
+  .mapmodal-head input { flex: 1; }
+  #mapClose { width: auto; min-width: 42px; }
+  .map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 10px; max-height: 62vh; overflow-y: auto; padding-right: 4px; }
+  .map-card { cursor: pointer; border: 1px solid var(--line); border-radius: 8px;
+    overflow: hidden; background: #12151a; transition: .12s; }
+  .map-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .map-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: #0a0c0f; }
+  .map-card span { display: block; padding: 5px 6px; font-size: 11px; color: var(--txt);
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-empty { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; grid-column: 1 / -1; }
+
   /* Mobile / écrans étroits : on empile tout et le canvas devient fluide. */
   @media (max-width: 860px) {
     body { height: auto; min-height: 100vh; overflow: auto; }
@@ -99,9 +122,7 @@
   <aside class="panel">
     <div class="group">
       <div class="title">Map</div>
-      <label class="row"><span>Choisir</span>
-        <select id="mapSelect"><option value="">- chargement… -</option></select>
-      </label>
+      <button class="primary" id="mapPick">🗺️ Choisir une map</button>
       <input type="text" id="mapName" placeholder="ID d'arène (auto-rempli)">
       <button class="filebtn">📷 Fond personnalisé (fichier)
         <input type="file" id="bgFile" accept="image/*">
@@ -196,6 +217,28 @@
   <span>Astuce : charge d'abord le fond de minimap, puis clique le parcours. Exporte le <b>.png</b> pour le mod et le <b>.json</b> pour rééditer plus tard.</span>
 </footer>
 
+<!-- Modale (remplace alert/confirm) -->
+<div id="modal" class="modal-backdrop hidden">
+  <div class="modal-box">
+    <p id="modalMsg"></p>
+    <div class="modal-actions">
+      <button id="modalCancel">Annuler</button>
+      <button id="modalOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale de choix de map (grille d'icônes + recherche) -->
+<div id="mapModal" class="modal-backdrop hidden">
+  <div class="modal-box mapmodal-box">
+    <div class="mapmodal-head">
+      <input type="text" id="mapSearch" placeholder="Rechercher une map…" autocomplete="off">
+      <button id="mapClose">✕</button>
+    </div>
+    <div id="mapGrid" class="map-grid"></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 (function () {
@@ -209,6 +252,26 @@
   let dragging = false;
 
   const el = (id) => document.getElementById(id);
+
+  // Modale stylée -> remplace alert()/confirm(). Renvoie une Promise<boolean>.
+  function modal(message, { confirm = false, okText = "OK" } = {}) {
+    return new Promise((resolve) => {
+      const back = el("modal");
+      el("modalMsg").textContent = message;
+      el("modalOk").textContent = okText;
+      el("modalCancel").style.display = confirm ? "" : "none";
+      back.classList.remove("hidden");
+      const done = (val) => {
+        back.classList.add("hidden");
+        el("modalOk").onclick = el("modalCancel").onclick = back.onclick = null;
+        resolve(val);
+      };
+      el("modalOk").onclick = () => done(true);
+      el("modalCancel").onclick = () => done(false);
+      back.onclick = (e) => { if (e.target === back) done(false); };  // clic hors boîte = annuler
+    });
+  }
+
   const style = {
     mode: "circuit", color: "#f1c40f", width: 10, opacity: 100, closed: false,
     arrows: true, showPts: true, checker: true, outline: true, outlineWidth: 6, bgDim: 35,
@@ -472,7 +535,11 @@
 
   el("undo").addEventListener("click", () => { pts.pop(); sel = pts.length - 1; render(); });
   el("delSel").addEventListener("click", () => { if (sel >= 0) { pts.splice(sel, 1); sel = pts.length - 1; render(); } });
-  el("clearAll").addEventListener("click", () => { if (confirm("Effacer tout le tracé ?")) { pts = []; sel = -1; render(); } });
+  el("clearAll").addEventListener("click", () => {
+    modal("Effacer tout le tracé ?", { confirm: true, okText: "Effacer" }).then((ok) => {
+      if (ok) { pts = []; sel = -1; render(); }
+    });
+  });
 
   el("bgFile").addEventListener("change", (e) => {
     const f = e.target.files[0]; if (!f) return;
@@ -522,7 +589,7 @@
         el("checker").checked = style.checker !== false;
         syncStyleControls();
         sel = -1; render();
-      } catch (err) { alert("JSON invalide : " + err.message); }
+      } catch (err) { modal("JSON invalide : " + err.message); }
     };
     r.readAsText(f);
   });
@@ -536,7 +603,7 @@
   });
 
   el("exportMap").addEventListener("click", () => {
-    if (!bg) { alert("Charge d'abord un fond de minimap (sélecteur ou fichier)."); return; }
+    if (!bg) { modal("Charge d'abord un fond de minimap (choisis une map ou un fichier)."); return; }
     const res = +el("exportRes").value;
     const off = document.createElement("canvas");
     off.width = off.height = res;
@@ -547,31 +614,53 @@
     off.toBlob((blob) => download(safeName() + "_minimap_" + res + ".png", blob), "image/png");
   });
 
-  // --- Sélecteur de map (fonds embarqués dans le projet, via le manifeste) ----
-  (function initMapSelect() {
-    const sel = el("mapSelect");
+  // --- Choix de map : modale en grille (icônes + noms + recherche) ------------
+  (function initMapPicker() {
+    const grid = el("mapGrid");
+    let entries = [];
+
+    const openModal = () => { el("mapModal").classList.remove("hidden"); el("mapSearch").focus(); };
+    const closeModal = () => { el("mapModal").classList.add("hidden"); };
+
+    const selectMap = (e) => {
+      el("mapName").value = e.id;                     // ID d'arène -> champ Map
+      const img = new Image();
+      img.onload = () => { bg = img; render(); };
+      img.src = "minimaps/" + e.file;
+      closeModal();
+    };
+
+    const renderGrid = (q = "") => {
+      const needle = q.trim().toLowerCase();
+      const list = entries.filter((e) => e.name.toLowerCase().includes(needle) ||
+                                          e.id.toLowerCase().includes(needle));
+      grid.innerHTML = "";
+      if (!list.length) { grid.innerHTML = '<div class="map-empty">Aucune map.</div>'; return; }
+      for (const e of list) {
+        const card = document.createElement("div");
+        card.className = "map-card";
+        card.innerHTML = `<img loading="lazy" src="minimaps/${e.file}" alt="${e.name}"><span>${e.name}</span>`;
+        card.addEventListener("click", () => selectMap(e));
+        grid.appendChild(card);
+      }
+    };
+
+    el("mapPick").addEventListener("click", openModal);
+    el("mapClose").addEventListener("click", closeModal);
+    el("mapModal").addEventListener("click", (ev) => { if (ev.target === el("mapModal")) closeModal(); });
+    el("mapSearch").addEventListener("input", (ev) => renderGrid(ev.target.value));
+
     fetch("minimaps/manifest.json")
       .then((r) => r.json())
       .then((man) => {
-        const entries = Object.keys(man)
+        entries = Object.keys(man)
           .map((id) => ({ id, name: man[id].name, file: man[id].file }))
           .sort((a, b) => a.name.localeCompare(b.name));
-        sel.innerHTML =
-          '<option value="">- choisir une map -</option>' +
-          entries.map((e) =>
-            `<option value="${e.id}" data-file="${e.file}">${e.name}</option>`).join("");
-        sel.addEventListener("change", () => {
-          const opt = sel.selectedOptions[0];
-          if (!opt || !opt.value) return;
-          el("mapName").value = opt.value;                 // ID d'arène -> champ Map
-          const img = new Image();
-          img.onload = () => { bg = img; render(); };
-          img.src = "minimaps/" + opt.getAttribute("data-file");
-        });
+        renderGrid();
       })
       .catch(() => {
-        sel.innerHTML =
-          '<option value="">(liste indispo hors-ligne - utilise le fichier)</option>';
+        el("mapPick").textContent = "Liste indispo (utilise le fichier)";
+        el("mapPick").disabled = true;
       });
   })();
 
