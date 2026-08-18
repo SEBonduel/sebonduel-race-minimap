@@ -395,7 +395,7 @@
 
       if (style.mode === "circuit" || style.mode === "road") {
         // Piste : bitume + vibreurs rouge/blanc sur les bords + ligne médiane.
-        const kerb = Math.max(4, style.width * 0.45);          // largeur d'un vibreur (px@512)
+        const kerb = Math.max(3, style.width * 0.28);          // largeur d'un vibreur (px@512)
         const outer = (style.width + 2 * kerb) * k;            // largeur totale piste+vibreurs
         const dash = Math.max(6, style.width + kerb) * k;      // longueur des bandes vibreur
         // liseré noir intrinsèque à la piste (indépendant des réglages "contour")
@@ -435,7 +435,7 @@
       if (style.checker) {
         const roadW = (style.mode === "line")
           ? style.width * k
-          : (style.width + 2 * Math.max(4, style.width * 0.45)) * k;
+          : (style.width + 2 * Math.max(3, style.width * 0.28)) * k;
         const drawChecker = (pt, tan) => {
           const ang = Math.atan2(tan.y, tan.x);
           const halfW = roadW / 2 + 3 * k;                 // léger débord de part et d'autre
