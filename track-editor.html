@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEBonduel - Éditeur de tracé minimap (courses de chars)</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1e2229; --panel2: #262b33; --line: #333a44;
+    --txt: #e6e9ee; --muted: #8b95a3; --accent: #f1c40f; --accent2: #e67e22;
+    --green: #2ecc71; --red: #e74c3c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--txt);
+    font: 14px/1.4 system-ui, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0; color: var(--accent); white-space: nowrap; }
+  header h1 span { color: var(--muted); font-weight: 400; }
+  .grow { flex: 1; }
+  .main { display: flex; flex: 1; min-height: 0; }
+  .panel {
+    width: 280px; background: var(--panel); border-right: 1px solid var(--line);
+    padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+  }
+  .panel.right { border-right: none; border-left: 1px solid var(--line); }
+  .stage {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: #0d0f12 repeating-linear-gradient(45deg, #0d0f12 0 10px, #101318 10px 20px);
+    min-width: 0; padding: 16px;
+  }
+  canvas { background: #000; border: 1px solid var(--line); cursor: crosshair;
+           box-shadow: 0 8px 30px rgba(0,0,0,.5); touch-action: none; }
+  .group { display: flex; flex-direction: column; gap: 8px; }
+  .group > .title { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+                    color: var(--muted); margin-bottom: 2px; }
+  label.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  label.row span { color: var(--muted); }
+  button {
+    background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
+    padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    transition: .12s; width: 100%; text-align: center;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.danger:hover { border-color: var(--red); color: var(--red); }
+  input[type="text"], input[type="number"], select {
+    background: #12151a; color: var(--txt); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 8px; font-size: 13px; width: 100%;
+  }
+  input[type="range"] { width: 130px; }
+  input[type="color"] { width: 42px; height: 28px; padding: 0; border: 1px solid var(--line);
+                        border-radius: 6px; background: none; cursor: pointer; }
+  input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .hint { color: var(--muted); font-size: 12px; }
+  .hint b { color: var(--txt); }
+  .kbd { background: #0d0f12; border: 1px solid var(--line); border-radius: 4px;
+         padding: 1px 6px; font-size: 11px; color: var(--txt); }
+  .pill { display: inline-block; background: var(--panel2); border: 1px solid var(--line);
+          border-radius: 20px; padding: 3px 10px; font-size: 12px; }
+  .count { color: var(--accent); font-weight: 600; }
+  .filebtn { position: relative; overflow: hidden; }
+  .filebtn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .divider { height: 1px; background: var(--line); }
+  footer { padding: 6px 16px; background: var(--panel); border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 12px; display: flex; gap: 16px; align-items:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏁 SEBonduel - Éditeur de tracé <span>· minimap courses de chars</span></h1>
+  <div class="grow"></div>
+  <div class="pill">Points : <span class="count" id="ptCount">0</span></div>
+</header>
+
+<div class="main">
+  <!-- PANNEAU GAUCHE : fichiers -->
+  <aside class="panel">
+    <div class="group">
+      <div class="title">Map</div>
+      <label class="row"><span>Choisir</span>
+        <select id="mapSelect"><option value="">- chargement… -</option></select>
+      </label>
+      <input type="text" id="mapName" placeholder="ID d'arène (auto-rempli)">
+      <button class="filebtn">📷 Fond personnalisé (fichier)
+        <input type="file" id="bgFile" accept="image/*">
+      </button>
+      <button id="clearBg">Retirer le fond</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="group">
+      <div class="title">Projet</div>
+      <button class="filebtn">📂 Charger un tracé (.json)
+        <input type="file" id="jsonFile" accept="application/json,.json">
+      </button>
+      <button id="exportJson">💾 Exporter le tracé (.json)</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="group">
+      <div class="title">Export pour le mod</div>
+      <label class="row"><span>Résolution PNG</span>
+        <select id="exportRes">
+          <option value="512">512 × 512</option>
+          <option value="1024" selected>1024 × 1024</option>
+          <option value="2048">2048 × 2048</option>
+        </select>
+      </label>
+      <button class="primary" id="exportPng">🖼️ Exporter l'overlay (.png)</button>
+      <div class="hint">Le PNG exporté est <b>transparent</b> (tracé seul, sans le fond) - prêt à être posé sur la minimap par le mod.</div>
+    </div>
+  </aside>
+
+  <!-- SCÈNE -->
+  <div class="stage">
+    <canvas id="cv" width="760" height="760"></canvas>
+  </div>
+
+  <!-- PANNEAU DROIT : style + édition -->
+  <aside class="panel right">
+    <div class="group">
+      <div class="title">Style du tracé</div>
+      <label class="row"><span>Style</span>
+        <select id="trackStyle">
+          <option value="line">Ligne simple</option>
+          <option value="road">Route / vibreurs F1</option>
+        </select>
+      </label>
+      <label class="row"><span>Couleur ligne</span><input type="color" id="lineColor" value="#f1c40f"></label>
+      <label class="row"><span>Épaisseur</span><input type="range" id="lineWidth" min="2" max="30" value="10"></label>
+      <label class="row"><span>Opacité du tracé</span><input type="range" id="opacity" min="10" max="100" value="100"></label>
+      <label class="row"><span>Boucle (circuit fermé)</span><input type="checkbox" id="closed"></label>
+      <label class="row"><span>Flèches de sens</span><input type="checkbox" id="arrows" checked></label>
+      <label class="row"><span>Checkpoints numérotés</span><input type="checkbox" id="showPts" checked></label>
+      <label class="row"><span>Contour noir (lisibilité)</span><input type="checkbox" id="outline" checked></label>
+      <label class="row"><span>Épaisseur du contour</span><input type="range" id="outlineWidth" min="0" max="20" value="6"></label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="group">
+      <div class="title">Aperçu</div>
+      <label class="row"><span>Assombrir le fond</span><input type="range" id="bgDim" min="0" max="100" value="35"></label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="group">
+      <div class="title">Édition</div>
+      <button id="undo">↶ Annuler le dernier point</button>
+      <button id="delSel" class="danger">🗑️ Supprimer le point sélectionné</button>
+      <button id="clearAll" class="danger">Tout effacer</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="group">
+      <div class="hint">
+        <b>Clic</b> = ajouter un point &nbsp;·&nbsp; <b>glisser</b> un point = le déplacer<br>
+        <b>Clic droit</b> sur un point = le supprimer<br>
+        <span class="kbd">Suppr</span> supprime le point sélectionné &nbsp;
+        <span class="kbd">Ctrl+Z</span> annule le dernier<br><br>
+        Le <b>1ᵉʳ point</b> = 🟢 départ. En mode non-bouclé, le <b>dernier</b> = 🔴 arrivée.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  <span>Astuce : charge d'abord le fond de minimap, puis clique le parcours. Exporte le <b>.png</b> pour le mod et le <b>.json</b> pour rééditer plus tard.</span>
+</footer>
+
+<script>
+"use strict";
+(function () {
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const SIZE = cv.width;            // canvas carré (minimap carrée)
+  const BASE = 512;                 // épaisseurs/rayons exprimés en px @512
+  let bg = null;                    // Image du fond
+  let pts = [];                     // points normalisés {x:0..1, y:0..1}
+  let sel = -1;                     // index sélectionné
+  let dragging = false;
+
+  const el = (id) => document.getElementById(id);
+  const style = {
+    mode: "line", color: "#f1c40f", width: 10, opacity: 100, closed: false,
+    arrows: true, showPts: true, outline: true, outlineWidth: 6, bgDim: 35,
+  };
+
+  // ---- Conversion coordonnées ------------------------------------------------
+  const toPx = (p, s = SIZE) => ({ x: p.x * s, y: p.y * s });
+  const scaleAt = (s) => s / BASE;
+
+  // ---- Spline Catmull-Rom -> segments de Bézier cubique ----------------------
+  function segments(points, closed) {
+    const n = points.length, segs = [];
+    if (n < 2) return segs;
+    const count = closed ? n : n - 1;
+    for (let i = 0; i < count; i++) {
+      const p0 = points[closed ? (i - 1 + n) % n : Math.max(i - 1, 0)];
+      const p1 = points[i];
+      const p2 = points[closed ? (i + 1) % n : i + 1];
+      const p3 = points[closed ? (i + 2) % n : Math.min(i + 2, n - 1)];
+      segs.push({
+        p1,
+        c1: { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 },
+        c2: { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 },
+        p2,
+      });
+    }
+    return segs;
+  }
+  function bezierAt(s, t) {
+    const u = 1 - t, tt = t * t, uu = u * u, uuu = uu * u, ttt = tt * t;
+    return {
+      x: uuu * s.p1.x + 3 * uu * t * s.c1.x + 3 * u * tt * s.c2.x + ttt * s.p2.x,
+      y: uuu * s.p1.y + 3 * uu * t * s.c1.y + 3 * u * tt * s.c2.y + ttt * s.p2.y,
+    };
+  }
+  function bezierTangent(s, t) {
+    const u = 1 - t;
+    return {
+      x: 3 * u * u * (s.c1.x - s.p1.x) + 6 * u * t * (s.c2.x - s.c1.x) + 3 * t * t * (s.p2.x - s.c2.x),
+      y: 3 * u * u * (s.c1.y - s.p1.y) + 6 * u * t * (s.c2.y - s.c1.y) + 3 * t * t * (s.p2.y - s.c2.y),
+    };
+  }
+
+  // ---- Rendu -----------------------------------------------------------------
+  // target: canvas de sortie. withBg: dessiner le fond. s: taille cible.
+  function draw(context, s, withBg) {
+    context.clearRect(0, 0, s, s);
+    if (withBg) {
+      if (bg) {
+        context.drawImage(bg, 0, 0, s, s);
+        if (style.bgDim > 0) {
+          context.fillStyle = "rgba(0,0,0," + (style.bgDim / 100) + ")";
+          context.fillRect(0, 0, s, s);
+        }
+      } else {
+        // grille de repère quand pas de fond
+        context.fillStyle = "#0a0c0f"; context.fillRect(0, 0, s, s);
+        context.strokeStyle = "#1c2128"; context.lineWidth = 1;
+        for (let i = 1; i < 10; i++) {
+          const g = (i / 10) * s;
+          context.beginPath(); context.moveTo(g, 0); context.lineTo(g, s); context.stroke();
+          context.beginPath(); context.moveTo(0, g); context.lineTo(s, g); context.stroke();
+        }
+      }
+    }
+
+    const P = pts.map((p) => toPx(p, s));
+    const k = scaleAt(s);
+    const segs = segments(P, style.closed && P.length > 2);
+
+    // trait
+    if (segs.length) {
+      const trace = () => {
+        context.beginPath();
+        context.moveTo(segs[0].p1.x, segs[0].p1.y);
+        for (const g of segs) context.bezierCurveTo(g.c1.x, g.c1.y, g.c2.x, g.c2.y, g.p2.x, g.p2.y);
+      };
+      context.lineJoin = "round";
+      const alpha = Math.max(0, Math.min(1, style.opacity / 100));
+
+      if (style.mode === "road") {
+        // Piste : bitume + vibreurs rouge/blanc sur les bords + ligne médiane.
+        const kerb = Math.max(4, style.width * 0.45);          // largeur d'un vibreur (px@512)
+        const outer = (style.width + 2 * kerb) * k;            // largeur totale piste+vibreurs
+        const dash = Math.max(6, style.width + kerb) * k;      // longueur des bandes vibreur
+        if (style.outline && style.outlineWidth > 0) {
+          context.lineCap = "round";
+          trace(); context.strokeStyle = "rgba(0,0,0,.85)";
+          context.lineWidth = outer + style.outlineWidth * k; context.stroke();
+        }
+        context.save();
+        context.globalAlpha = alpha;
+        // base blanche des vibreurs, puis bandes rouges par-dessus = alternance
+        context.lineCap = "butt"; context.setLineDash([]);
+        trace(); context.strokeStyle = "#ffffff"; context.lineWidth = outer; context.stroke();
+        context.setLineDash([dash, dash]);
+        trace(); context.strokeStyle = "#e12d2d"; context.lineWidth = outer; context.stroke();
+        // asphalte : recouvre le centre, ne laisse que les vibreurs sur les bords
+        context.setLineDash([]); context.lineCap = "round";
+        trace(); context.strokeStyle = "#2b2b2b"; context.lineWidth = style.width * k; context.stroke();
+        // ligne médiane pointillée
+        context.setLineDash([dash * 0.9, dash * 0.9]);
+        trace(); context.strokeStyle = "rgba(255,255,255,.8)";
+        context.lineWidth = Math.max(1.5, style.width * 0.1) * k; context.stroke();
+        context.setLineDash([]);
+        context.restore();
+      } else {
+        // Ligne simple colorée.
+        context.lineCap = "round";
+        if (style.outline && style.outlineWidth > 0) {
+          trace(); context.strokeStyle = "rgba(0,0,0,.85)";
+          context.lineWidth = (style.width + style.outlineWidth) * k; context.stroke();
+        }
+        context.save();
+        context.globalAlpha = alpha;
+        trace(); context.strokeStyle = style.color; context.lineWidth = style.width * k; context.stroke();
+        context.restore();
+      }
+
+      // flèches de sens
+      if (style.arrows) {
+        const a = (style.width + 8) * k;
+        for (const g of segs) {
+          const pos = bezierAt(g, 0.5), tan = bezierTangent(g, 0.5);
+          const ang = Math.atan2(tan.y, tan.x);
+          context.save(); context.translate(pos.x, pos.y); context.rotate(ang);
+          context.beginPath();
+          context.moveTo(a, 0); context.lineTo(-a * 0.6, a * 0.7); context.lineTo(-a * 0.6, -a * 0.7);
+          context.closePath();
+          context.fillStyle = "#ffffff"; context.strokeStyle = "rgba(0,0,0,.85)";
+          context.lineWidth = 2 * k; context.fill(); context.stroke();
+          context.restore();
+        }
+      }
+    }
+
+    // points / checkpoints
+    if (style.showPts) {
+      const r = Math.max(7, (style.width * 0.9 + 6)) * k;
+      P.forEach((p, i) => {
+        const isStart = i === 0;
+        const isFinish = !style.closed && i === P.length - 1 && P.length > 1;
+        let fill = "#3498db", txt = String(i);
+        if (isStart) { fill = "#2ecc71"; txt = "D"; }
+        else if (isFinish) { fill = "#e74c3c"; txt = "A"; }
+        context.beginPath(); context.arc(p.x, p.y, r, 0, Math.PI * 2);
+        context.fillStyle = fill; context.fill();
+        context.lineWidth = 3 * k;
+        context.strokeStyle = (i === sel) ? "#ffffff" : "rgba(0,0,0,.8)";
+        context.stroke();
+        context.fillStyle = "#0e0e0e"; context.textAlign = "center"; context.textBaseline = "middle";
+        context.font = "700 " + Math.round(r * 1.05) + "px system-ui, sans-serif";
+        context.fillText(txt, p.x, p.y + r * 0.05);
+      });
+    }
+  }
+
+  function render() {
+    draw(ctx, SIZE, true);
+    el("ptCount").textContent = pts.length;
+  }
+
+  // ---- Souris ----------------------------------------------------------------
+  function evPos(e) {
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+  }
+  function hit(p) {
+    const rNorm = Math.max(0.02, (style.width * 0.9 + 8) / BASE);
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const dx = pts[i].x - p.x, dy = pts[i].y - p.y;
+      if (Math.hypot(dx, dy) < rNorm) return i;
+    }
+    return -1;
+  }
+
+  cv.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    const p = evPos(e), h = hit(p);
+    if (h >= 0) { sel = h; dragging = true; }
+    else { pts.push(p); sel = pts.length - 1; }
+    render();
+  });
+  cv.addEventListener("mousemove", (e) => {
+    if (!dragging || sel < 0) return;
+    pts[sel] = evPos(e); render();
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
+  cv.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const h = hit(evPos(e));
+    if (h >= 0) { pts.splice(h, 1); if (sel >= pts.length) sel = pts.length - 1; render(); }
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (sel >= 0) { pts.splice(sel, 1); sel = pts.length - 1; render(); }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      pts.pop(); sel = pts.length - 1; render();
+    } else if (e.key === "Escape") { sel = -1; render(); }
+  });
+
+  // ---- Contrôles -------------------------------------------------------------
+  el("trackStyle").addEventListener("change", (e) => { style.mode = e.target.value; render(); });
+  el("lineColor").addEventListener("input", (e) => { style.color = e.target.value; render(); });
+  el("lineWidth").addEventListener("input", (e) => { style.width = +e.target.value; render(); });
+  el("opacity").addEventListener("input", (e) => { style.opacity = +e.target.value; render(); });
+  el("outlineWidth").addEventListener("input", (e) => { style.outlineWidth = +e.target.value; render(); });
+  el("closed").addEventListener("change", (e) => { style.closed = e.target.checked; render(); });
+  el("arrows").addEventListener("change", (e) => { style.arrows = e.target.checked; render(); });
+  el("showPts").addEventListener("change", (e) => { style.showPts = e.target.checked; render(); });
+  el("outline").addEventListener("change", (e) => { style.outline = e.target.checked; render(); });
+  el("bgDim").addEventListener("input", (e) => { style.bgDim = +e.target.value; render(); });
+
+  el("undo").addEventListener("click", () => { pts.pop(); sel = pts.length - 1; render(); });
+  el("delSel").addEventListener("click", () => { if (sel >= 0) { pts.splice(sel, 1); sel = pts.length - 1; render(); } });
+  el("clearAll").addEventListener("click", () => { if (confirm("Effacer tout le tracé ?")) { pts = []; sel = -1; render(); } });
+
+  el("bgFile").addEventListener("change", (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const img = new Image();
+    img.onload = () => { bg = img; render(); };
+    img.src = URL.createObjectURL(f);
+  });
+  el("clearBg").addEventListener("click", () => { bg = null; render(); });
+
+  // ---- Import / Export -------------------------------------------------------
+  function download(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function safeName() {
+    return (el("mapName").value.trim() || "circuit").toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
+  }
+
+  el("exportJson").addEventListener("click", () => {
+    const data = {
+      map: el("mapName").value.trim(), closed: style.closed,
+      style: { mode: style.mode, color: style.color, width: style.width, opacity: style.opacity, arrows: style.arrows, showPts: style.showPts, outline: style.outline, outlineWidth: style.outlineWidth },
+      points: pts.map((p) => ({ x: +p.x.toFixed(5), y: +p.y.toFixed(5) })),
+    };
+    download(safeName() + "_track.json", new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  });
+
+  el("jsonFile").addEventListener("change", (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result);
+        pts = (d.points || []).map((p) => ({ x: p.x, y: p.y }));
+        if (typeof d.map === "string") el("mapName").value = d.map;
+        if (d.style) Object.assign(style, d.style);
+        style.closed = !!d.closed;
+        // refléter dans l'UI
+        el("mapName").dispatchEvent(new Event("input"));
+        el("trackStyle").value = style.mode || "line";
+        el("lineColor").value = style.color; el("lineWidth").value = style.width;
+        el("opacity").value = style.opacity; el("outlineWidth").value = style.outlineWidth;
+        el("closed").checked = style.closed; el("arrows").checked = style.arrows;
+        el("showPts").checked = style.showPts; el("outline").checked = style.outline;
+        sel = -1; render();
+      } catch (err) { alert("JSON invalide : " + err.message); }
+    };
+    r.readAsText(f);
+  });
+
+  el("exportPng").addEventListener("click", () => {
+    const res = +el("exportRes").value;
+    const off = document.createElement("canvas");
+    off.width = off.height = res;
+    draw(off.getContext("2d"), res, false); // false = pas de fond -> PNG transparent
+    off.toBlob((blob) => download(safeName() + "_overlay_" + res + ".png", blob), "image/png");
+  });
+
+  // --- Sélecteur de map (fonds embarqués dans le projet, via le manifeste) ----
+  (function initMapSelect() {
+    const sel = el("mapSelect");
+    fetch("minimaps/manifest.json")
+      .then((r) => r.json())
+      .then((man) => {
+        const entries = Object.keys(man)
+          .map((id) => ({ id, name: man[id].name, file: man[id].file }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        sel.innerHTML =
+          '<option value="">- choisir une map -</option>' +
+          entries.map((e) =>
+            `<option value="${e.id}" data-file="${e.file}">${e.name}</option>`).join("");
+        sel.addEventListener("change", () => {
+          const opt = sel.selectedOptions[0];
+          if (!opt || !opt.value) return;
+          el("mapName").value = opt.value;                 // ID d'arène -> champ Map
+          const img = new Image();
+          img.onload = () => { bg = img; render(); };
+          img.src = "minimaps/" + opt.getAttribute("data-file");
+        });
+      })
+      .catch(() => {
+        sel.innerHTML =
+          '<option value="">(liste indispo hors-ligne - utilise le fichier)</option>';
+      });
+  })();
+
+  render();
+})();
+</script>
+</body>
+</html>

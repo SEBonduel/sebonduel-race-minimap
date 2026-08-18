@@ -1,0 +1,10 @@
+# Sorties de build (regénérées par mod/build.py)
+dist/
+mod/_staging/
+
+# Python
+**/__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

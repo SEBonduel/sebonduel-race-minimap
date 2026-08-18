@@ -1,0 +1,194 @@
+{
+  "01_karelia": {
+    "name": "Karelia",
+    "file": "01_karelia.webp"
+  },
+  "02_malinovka": {
+    "name": "Malinovka",
+    "file": "02_malinovka.webp"
+  },
+  "03_campania_big": {
+    "name": "Province",
+    "file": "03_campania_big.webp"
+  },
+  "04_himmelsdorf": {
+    "name": "Himmelsdorf",
+    "file": "04_himmelsdorf.webp"
+  },
+  "05_prohorovka": {
+    "name": "Prohorovka",
+    "file": "05_prohorovka.webp"
+  },
+  "06_ensk": {
+    "name": "Ensk",
+    "file": "06_ensk.webp"
+  },
+  "06_ensk_big": {
+    "name": "Ensk Region",
+    "file": "06_ensk_big.webp"
+  },
+  "07_lakeville": {
+    "name": "Lakeville",
+    "file": "07_lakeville.webp"
+  },
+  "08_ruinberg": {
+    "name": "Ruinberg",
+    "file": "08_ruinberg.webp"
+  },
+  "10_hills": {
+    "name": "Mines",
+    "file": "10_hills.webp"
+  },
+  "11_murovanka": {
+    "name": "Murovanka",
+    "file": "11_murovanka.webp"
+  },
+  "13_erlenberg": {
+    "name": "Erlenberg",
+    "file": "13_erlenberg.webp"
+  },
+  "14_siegfried_line": {
+    "name": "Siegfried Line",
+    "file": "14_siegfried_line.webp"
+  },
+  "17_munchen": {
+    "name": "Widepark",
+    "file": "17_munchen.webp"
+  },
+  "18_cliff": {
+    "name": "Cliff",
+    "file": "18_cliff.webp"
+  },
+  "19_monastery": {
+    "name": "Abbey",
+    "file": "19_monastery.webp"
+  },
+  "23_westfeld": {
+    "name": "Westfield",
+    "file": "23_westfeld.webp"
+  },
+  "28_desert": {
+    "name": "Sand River",
+    "file": "28_desert.webp"
+  },
+  "29_el_hallouf": {
+    "name": "El Halluf",
+    "file": "29_el_hallouf.webp"
+  },
+  "31_airfield": {
+    "name": "Airfield",
+    "file": "31_airfield.webp"
+  },
+  "33_fjord": {
+    "name": "Fjords",
+    "file": "33_fjord.webp"
+  },
+  "34_redshire": {
+    "name": "Redshire",
+    "file": "34_redshire.webp"
+  },
+  "35_steppes": {
+    "name": "Steppes",
+    "file": "35_steppes.webp"
+  },
+  "36_fishing_bay": {
+    "name": "Fisherman's Bay",
+    "file": "36_fishing_bay.webp"
+  },
+  "37_caucasus": {
+    "name": "Mountain Pass",
+    "file": "37_caucasus.webp"
+  },
+  "38_mannerheim_line": {
+    "name": "Mannerheim Line",
+    "file": "38_mannerheim_line.webp"
+  },
+  "44_north_america": {
+    "name": "Live Oaks",
+    "file": "44_north_america.webp"
+  },
+  "45_north_america": {
+    "name": "Highway",
+    "file": "45_north_america.webp"
+  },
+  "47_canada_a": {
+    "name": "Serene Coast",
+    "file": "47_canada_a.webp"
+  },
+  "59_asia_great_wall": {
+    "name": "Empire's Border",
+    "file": "59_asia_great_wall.webp"
+  },
+  "60_asia_miao": {
+    "name": "Pearl River",
+    "file": "60_asia_miao.webp"
+  },
+  "63_tundra": {
+    "name": "Tundra",
+    "file": "63_tundra.webp"
+  },
+  "83_kharkiv": {
+    "name": "Kharkov",
+    "file": "83_kharkiv.webp"
+  },
+  "90_minsk": {
+    "name": "Minsk",
+    "file": "90_minsk.webp"
+  },
+  "99_poland": {
+    "name": "Studzianki",
+    "file": "99_poland.webp"
+  },
+  "101_dday": {
+    "name": "Overlord",
+    "file": "101_dday.webp"
+  },
+  "105_germany": {
+    "name": "Berlin",
+    "file": "105_germany.webp"
+  },
+  "112_eiffel_tower_ctf": {
+    "name": "Paris",
+    "file": "112_eiffel_tower_ctf.webp"
+  },
+  "114_czech": {
+    "name": "Pilsen",
+    "file": "114_czech.webp"
+  },
+  "115_sweden": {
+    "name": "Glacier",
+    "file": "115_sweden.webp"
+  },
+  "128_last_frontier_v": {
+    "name": "Outpost",
+    "file": "128_last_frontier_v.webp"
+  },
+  "212_epic_random_valley": {
+    "name": "Nebelburg",
+    "file": "212_epic_random_valley.webp"
+  },
+  "217_er_alaska": {
+    "name": "Klondike",
+    "file": "217_er_alaska.webp"
+  },
+  "95_lost_city_ctf": {
+    "name": "Ghost Town",
+    "file": "95_lost_city_ctf.webp"
+  },
+  "222_er_clime": {
+    "name": "Hinterland",
+    "file": "222_er_clime.webp"
+  },
+  "127_japort": {
+    "name": "Safe Haven",
+    "file": "127_japort.webp"
+  },
+  "121_lost_paradise_v": {
+    "name": "Oyster Bay",
+    "file": "121_lost_paradise_v.webp"
+  },
+  "120_graf_zeppelin": {
+    "name": "Nordskar",
+    "file": "120_graf_zeppelin.webp"
+  }
+}

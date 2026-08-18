@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Métadonnées du paquet .wotmod (lues par le client WoT). -->
+<root>
+    <id>com.sebonduel.race_minimap</id>
+    <version>0.1.0</version>
+    <name>SEBonduel Race Minimap</name>
+    <description>Minimaps personnalisées avec tracés de course (courses de chars). Remplace la texture de minimap des maps concernées par terrain + circuit.</description>
+</root>
