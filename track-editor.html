@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <title>Éditeur de tracé World of Tanks - par SEBonduel</title>
 <style>
   :root {
@@ -70,6 +71,19 @@
   .divider { height: 1px; background: var(--line); }
   footer { padding: 6px 16px; background: var(--panel); border-top: 1px solid var(--line);
            color: var(--muted); font-size: 12px; display: flex; gap: 16px; align-items:center; }
+
+  /* Mobile / écrans étroits : on empile tout et le canvas devient fluide. */
+  @media (max-width: 860px) {
+    body { height: auto; min-height: 100vh; overflow: auto; }
+    header h1 { white-space: normal; font-size: 14px; }
+    .main { flex-direction: column; }
+    .panel { width: 100%; overflow: visible; border-right: none;
+             border-bottom: 1px solid var(--line); }
+    .panel.right { border-left: none; }
+    .stage { order: -1; min-height: 92vw; padding: 8px; }
+    canvas { width: 100%; max-width: 620px; height: auto; }
+    input[type="range"] { width: 45%; }
+  }
 </style>
 </head>
 <body>
@@ -117,7 +131,8 @@
         </select>
       </label>
       <button class="primary" id="exportPng">🖼️ Exporter l'overlay (.png)</button>
-      <div class="hint">Le PNG exporté est <b>transparent</b> (tracé seul, sans le fond) - prêt à être posé sur la minimap par le mod.</div>
+      <button id="exportMap">🗺️ Exporter la minimap (fond + tracé)</button>
+      <div class="hint"><b>Overlay</b> = tracé seul, transparent (fusionné au terrain par le mod). <b>Minimap</b> = fond + tracé déjà fusionnés (prêt à l'emploi / à partager).</div>
     </div>
   </aside>
 
@@ -410,19 +425,25 @@
     return -1;
   }
 
-  cv.addEventListener("mousedown", (e) => {
-    if (e.button !== 0) return;
+  // Pointer Events : gère souris ET tactile (mobile) de façon unifiée.
+  cv.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;               // clic droit/milieu -> voir contextmenu
     const p = evPos(e), h = hit(p);
     if (h >= 0) { sel = h; dragging = true; }
     else { pts.push(p); sel = pts.length - 1; }
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
     render();
   });
-  cv.addEventListener("mousemove", (e) => {
+  cv.addEventListener("pointermove", (e) => {
     if (!dragging || sel < 0) return;
     pts[sel] = evPos(e); render();
   });
-  window.addEventListener("mouseup", () => { dragging = false; });
-  cv.addEventListener("contextmenu", (e) => {
+  cv.addEventListener("pointerup", (e) => {
+    dragging = false;
+    try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+  });
+  cv.addEventListener("pointercancel", () => { dragging = false; });
+  cv.addEventListener("contextmenu", (e) => {   // suppression au clic droit (desktop)
     e.preventDefault();
     const h = hit(evPos(e));
     if (h >= 0) { pts.splice(h, 1); if (sel >= pts.length) sel = pts.length - 1; render(); }
@@ -512,6 +533,18 @@
     off.width = off.height = res;
     draw(off.getContext("2d"), res, false); // false = pas de fond -> PNG transparent
     off.toBlob((blob) => download(safeName() + "_overlay_" + res + ".png", blob), "image/png");
+  });
+
+  el("exportMap").addEventListener("click", () => {
+    if (!bg) { alert("Charge d'abord un fond de minimap (sélecteur ou fichier)."); return; }
+    const res = +el("exportRes").value;
+    const off = document.createElement("canvas");
+    off.width = off.height = res;
+    const savedDim = style.bgDim;
+    style.bgDim = 0;                          // pas d'assombrissement sur l'export final
+    draw(off.getContext("2d"), res, true);    // true = fond + tracé fusionnés
+    style.bgDim = savedDim;
+    off.toBlob((blob) => download(safeName() + "_minimap_" + res + ".png", blob), "image/png");
   });
 
   // --- Sélecteur de map (fonds embarqués dans le projet, via le manifeste) ----
