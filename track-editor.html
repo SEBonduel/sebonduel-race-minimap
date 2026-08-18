@@ -132,8 +132,8 @@
       <div class="title">Style du tracé</div>
       <label class="row"><span>Style</span>
         <select id="trackStyle">
+          <option value="circuit" selected>Circuit (vibreurs F1)</option>
           <option value="line">Ligne simple</option>
-          <option value="road">Route / vibreurs F1</option>
         </select>
       </label>
       <label class="row"><span>Couleur ligne</span><input type="color" id="lineColor" value="#f1c40f"></label>
@@ -142,8 +142,8 @@
       <label class="row"><span>Boucle (circuit fermé)</span><input type="checkbox" id="closed"></label>
       <label class="row"><span>Flèches de sens</span><input type="checkbox" id="arrows" checked></label>
       <label class="row"><span>Checkpoints numérotés</span><input type="checkbox" id="showPts" checked></label>
-      <label class="row"><span>Contour noir (lisibilité)</span><input type="checkbox" id="outline" checked></label>
-      <label class="row"><span>Épaisseur du contour</span><input type="range" id="outlineWidth" min="0" max="20" value="6"></label>
+      <label class="row" id="outlineRow"><span>Contour noir (lisibilité)</span><input type="checkbox" id="outline" checked></label>
+      <label class="row" id="outlineWidthRow"><span>Épaisseur du contour</span><input type="range" id="outlineWidth" min="0" max="20" value="6"></label>
     </div>
 
     <div class="divider"></div>
@@ -194,7 +194,7 @@
 
   const el = (id) => document.getElementById(id);
   const style = {
-    mode: "line", color: "#f1c40f", width: 10, opacity: 100, closed: false,
+    mode: "circuit", color: "#f1c40f", width: 10, opacity: 100, closed: false,
     arrows: true, showPts: true, outline: true, outlineWidth: 6, bgDim: 35,
   };
 
@@ -273,16 +273,15 @@
       context.lineJoin = "round";
       const alpha = Math.max(0, Math.min(1, style.opacity / 100));
 
-      if (style.mode === "road") {
+      if (style.mode === "circuit" || style.mode === "road") {
         // Piste : bitume + vibreurs rouge/blanc sur les bords + ligne médiane.
         const kerb = Math.max(4, style.width * 0.45);          // largeur d'un vibreur (px@512)
         const outer = (style.width + 2 * kerb) * k;            // largeur totale piste+vibreurs
         const dash = Math.max(6, style.width + kerb) * k;      // longueur des bandes vibreur
-        if (style.outline && style.outlineWidth > 0) {
-          context.lineCap = "round";
-          trace(); context.strokeStyle = "rgba(0,0,0,.85)";
-          context.lineWidth = outer + style.outlineWidth * k; context.stroke();
-        }
+        // liseré noir intrinsèque à la piste (indépendant des réglages "contour")
+        context.lineCap = "round";
+        trace(); context.strokeStyle = "rgba(0,0,0,.85)";
+        context.lineWidth = outer + 4 * k; context.stroke();
         context.save();
         context.globalAlpha = alpha;
         // base blanche des vibreurs, puis bandes rouges par-dessus = alternance
@@ -355,6 +354,13 @@
     el("ptCount").textContent = pts.length;
   }
 
+  // Réglages de contour : uniquement pertinents pour le style "Ligne simple".
+  function syncStyleControls() {
+    const lineOnly = style.mode === "line";
+    el("outlineRow").style.display = lineOnly ? "" : "none";
+    el("outlineWidthRow").style.display = lineOnly ? "" : "none";
+  }
+
   // ---- Souris ----------------------------------------------------------------
   function evPos(e) {
     const rect = cv.getBoundingClientRect();
@@ -398,7 +404,7 @@
   });
 
   // ---- Contrôles -------------------------------------------------------------
-  el("trackStyle").addEventListener("change", (e) => { style.mode = e.target.value; render(); });
+  el("trackStyle").addEventListener("change", (e) => { style.mode = e.target.value; syncStyleControls(); render(); });
   el("lineColor").addEventListener("input", (e) => { style.color = e.target.value; render(); });
   el("lineWidth").addEventListener("input", (e) => { style.width = +e.target.value; render(); });
   el("opacity").addEventListener("input", (e) => { style.opacity = +e.target.value; render(); });
@@ -452,11 +458,13 @@
         style.closed = !!d.closed;
         // refléter dans l'UI
         el("mapName").dispatchEvent(new Event("input"));
-        el("trackStyle").value = style.mode || "line";
+        if (style.mode === "road") style.mode = "circuit";  // compat ancien nom
+        el("trackStyle").value = style.mode || "circuit";
         el("lineColor").value = style.color; el("lineWidth").value = style.width;
         el("opacity").value = style.opacity; el("outlineWidth").value = style.outlineWidth;
         el("closed").checked = style.closed; el("arrows").checked = style.arrows;
         el("showPts").checked = style.showPts; el("outline").checked = style.outline;
+        syncStyleControls();
         sel = -1; render();
       } catch (err) { alert("JSON invalide : " + err.message); }
     };
@@ -499,6 +507,7 @@
       });
   })();
 
+  syncStyleControls();
   render();
 })();
 </script>
