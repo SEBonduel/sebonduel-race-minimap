@@ -142,6 +142,7 @@
       <label class="row"><span>Boucle (circuit fermé)</span><input type="checkbox" id="closed"></label>
       <label class="row"><span>Flèches de sens</span><input type="checkbox" id="arrows" checked></label>
       <label class="row"><span>Checkpoints numérotés</span><input type="checkbox" id="showPts" checked></label>
+      <label class="row"><span>Ligne départ/arrivée (damier)</span><input type="checkbox" id="checker" checked></label>
       <label class="row" id="outlineRow"><span>Contour noir (lisibilité)</span><input type="checkbox" id="outline" checked></label>
       <label class="row" id="outlineWidthRow"><span>Épaisseur du contour</span><input type="range" id="outlineWidth" min="0" max="20" value="6"></label>
     </div>
@@ -195,7 +196,7 @@
   const el = (id) => document.getElementById(id);
   const style = {
     mode: "circuit", color: "#f1c40f", width: 10, opacity: 100, closed: false,
-    arrows: true, showPts: true, outline: true, outlineWidth: 6, bgDim: 35,
+    arrows: true, showPts: true, checker: true, outline: true, outlineWidth: 6, bgDim: 35,
   };
 
   // ---- Conversion coordonnées ------------------------------------------------
@@ -311,6 +312,38 @@
         context.restore();
       }
 
+      // ligne départ/arrivée en damier (perpendiculaire au tracé)
+      if (style.checker) {
+        const roadW = (style.mode === "line")
+          ? style.width * k
+          : (style.width + 2 * Math.max(4, style.width * 0.45)) * k;
+        const drawChecker = (pt, tan) => {
+          const ang = Math.atan2(tan.y, tan.x);
+          const halfW = roadW / 2 + 3 * k;                 // léger débord de part et d'autre
+          const ch = Math.max(5, style.width * 0.55) * k;  // épaisseur d'une rangée
+          const ncols = Math.max(2, Math.round((2 * halfW) / ch));
+          const cw = (2 * halfW) / ncols;                  // largeur d'une case
+          context.save();
+          context.globalAlpha = alpha;
+          context.translate(pt.x, pt.y);
+          context.rotate(ang);                             // +x = sens du tracé, +y = travers
+          context.setLineDash([]);
+          for (let r = 0; r < 2; r++)
+            for (let c = 0; c < ncols; c++) {
+              context.fillStyle = ((r + c) % 2 === 0) ? "#ffffff" : "#101010";
+              context.fillRect(-ch + r * ch, -halfW + c * cw, ch, cw);
+            }
+          context.lineJoin = "miter";
+          context.strokeStyle = "rgba(0,0,0,.9)"; context.lineWidth = 2 * k;
+          context.strokeRect(-ch, -halfW, 2 * ch, 2 * halfW);
+          context.restore();
+        };
+        drawChecker(P[0], bezierTangent(segs[0], 0));
+        const closedLoop = style.closed && P.length > 2;
+        if (!closedLoop && P.length > 1)
+          drawChecker(P[P.length - 1], bezierTangent(segs[segs.length - 1], 1));
+      }
+
       // flèches de sens
       if (style.arrows) {
         const a = (style.width + 8) * k;
@@ -412,6 +445,7 @@
   el("closed").addEventListener("change", (e) => { style.closed = e.target.checked; render(); });
   el("arrows").addEventListener("change", (e) => { style.arrows = e.target.checked; render(); });
   el("showPts").addEventListener("change", (e) => { style.showPts = e.target.checked; render(); });
+  el("checker").addEventListener("change", (e) => { style.checker = e.target.checked; render(); });
   el("outline").addEventListener("change", (e) => { style.outline = e.target.checked; render(); });
   el("bgDim").addEventListener("input", (e) => { style.bgDim = +e.target.value; render(); });
 
@@ -440,7 +474,7 @@
   el("exportJson").addEventListener("click", () => {
     const data = {
       map: el("mapName").value.trim(), closed: style.closed,
-      style: { mode: style.mode, color: style.color, width: style.width, opacity: style.opacity, arrows: style.arrows, showPts: style.showPts, outline: style.outline, outlineWidth: style.outlineWidth },
+      style: { mode: style.mode, color: style.color, width: style.width, opacity: style.opacity, arrows: style.arrows, showPts: style.showPts, checker: style.checker, outline: style.outline, outlineWidth: style.outlineWidth },
       points: pts.map((p) => ({ x: +p.x.toFixed(5), y: +p.y.toFixed(5) })),
     };
     download(safeName() + "_track.json", new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -464,6 +498,7 @@
         el("opacity").value = style.opacity; el("outlineWidth").value = style.outlineWidth;
         el("closed").checked = style.closed; el("arrows").checked = style.arrows;
         el("showPts").checked = style.showPts; el("outline").checked = style.outline;
+        el("checker").checked = style.checker !== false;
         syncStyleControls();
         sel = -1; render();
       } catch (err) { alert("JSON invalide : " + err.message); }
